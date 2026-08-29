@@ -7,7 +7,7 @@
 mod actor_system;
 mod actors;
 mod backend;
-mod circuits;
+pub mod circuits;
 mod config;
 mod dkg_attestation_bundle;
 mod domain;
@@ -48,6 +48,7 @@ pub use circuits::threshold::pk_aggregation::PkAggregationCircuit;
 pub use circuits::threshold::pk_generation::PkGenerationCircuit;
 pub use circuits::threshold::share_decryption::ShareDecryptionCircuit as ThresholdShareDecryptionCircuit;
 pub use circuits::utils::inputs_json_to_input_map;
+pub use circuits::vk::{load_vk_artifacts, VkArtifacts};
 pub use config::{verify_checksum, BbTarget, CircuitInfo, VersionInfo, ZkConfig};
 pub use dkg_attestation_bundle::encode_dkg_attestation_bundle;
 pub use e3_zk_config::CircuitVariant;
