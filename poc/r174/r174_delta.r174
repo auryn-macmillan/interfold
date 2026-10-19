@@ -1,0 +1,13 @@
+r174 C1 pk_generation RE-ANCHOR @ 7795f18ea (post-#2195 secure-50-coeffs shape):
+  A1(unblunt)=1634686  B(range full NOP)=620203  C(per-limb NOP)=823671
+  ACIR: A1=582531 B=91011 C=189315
+  FAMILY(A1-B)=1014483 g = 62.06% of A1 leaf
+  PER-LIMB(A1-C)=811015 g = 49.61% of A1; FLAT(C-B)=203468 g = 12.45%
+  identity: 811015+203468=1014483=1014483 (holds)
+vs r157 @ 247298ad5 (OLD pre-fold shape):
+  A1 old=1634722 new=1634686 delta=-36
+  B  old=620203 new=620203 delta=+0
+  C  old=823709 new=823671 delta=-38
+  FAMILY old=1014519 new=1014483 delta=-36
+  PER-LIMB old=811013 new=811015 delta=+2
+  FLAT old=203506 new=203468 delta=-38
