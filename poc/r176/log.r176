@@ -1,0 +1,16 @@
+Preparing worktree (detached HEAD e5161e6e8)
+Updating files:  92% (3440/3717)Updating files:  93% (3457/3717)Updating files:  94% (3494/3717)Updating files:  95% (3532/3717)Updating files:  96% (3569/3717)Updating files:  97% (3606/3717)Updating files:  98% (3643/3717)Updating files:  99% (3680/3717)Updating files: 100% (3717/3717)Updating files: 100% (3717/3717), done.
+HEAD is now at e5161e6e8 r175: C3 share_encryption RE-ANCHOR RAN @ 6a8afd39d post-fold shape - C3A 2,124,535 g (delta -14 = -0.0007% vs r156), ACIR digit-identical 609,966/224,942/347,822; family 729,108 / per-limb 557,056 / flat 172,052 (flat digit-exact); identity holds. C3 insensitive to #2195 fold despite CT0_R 20->24 (width feeds only the direct-path quotient bounds; secure runs scaled path). 0 circuits/ 0 crates/ (receipts-only).
+[2026-10-19T12:54:32Z] HEAD=e5161e6e8bdc2624511aee6997bca324e6b20f3f
+[2026-10-19T12:55:40Z] r176A1_live rc=0 wall=68s
+[2026-10-19T12:55:41Z] LEG A1 DONE rc=0
+[2026-10-19T12:55:41Z] LEG E SPLICE APPLIED
+[2026-10-19T12:56:49Z] r176E_eek rc=0 wall=68s
+[2026-10-19T12:56:50Z] LEG E DONE rc=0
+[2026-10-19T12:56:50Z] LEG S SPLICE APPLIED
+[2026-10-19T12:57:56Z] r176S_sk rc=0 wall=66s
+[2026-10-19T12:57:57Z] RESTORED rc=0
+[2026-10-19T12:57:57Z] RESTORE rc=0 after leg S
+[2026-10-19T12:57:57Z] LEG S DONE rc=0
+[2026-10-19T12:57:58Z] PORC_NONUNTRACKED=0
+R176_STATUS=ALL_OK

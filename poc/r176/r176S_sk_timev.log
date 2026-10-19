@@ -1,0 +1,91 @@
+bug: Brillig function call isn't properly covered by a manual constraint
+    ┌─ /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:34
+    │
+241 │     let (quotient, _) = unsafe { __compute_mod_reduction(n, q) };
+    │                                  ----------------------------- This Brillig call's inputs and its return values haven't been sufficiently constrained. This should be done to prevent potential soundness vulnerabilities
+    │
+    = Call stack:
+      1: main
+              at decrypted_shares_aggregation/src/main.nr:30:5
+      2: DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, N_PARTIES, BIT_D_NATIVE, BIT_Q, BIT_K, BIT_T, BIT_Q_TOTAL>::execute
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:99:28
+      3: lagrange_coefficients
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:171:27
+      4: inv_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:293:27
+      5: reduce_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:40
+
+bug: Brillig function call isn't properly covered by a manual constraint
+    ┌─ /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:34
+    │
+241 │     let (quotient, _) = unsafe { __compute_mod_reduction(n, q) };
+    │                                  ----------------------------- This Brillig call's inputs and its return values haven't been sufficiently constrained. This should be done to prevent potential soundness vulnerabilities
+    │
+    = Call stack:
+      1: main
+              at decrypted_shares_aggregation/src/main.nr:30:5
+      2: DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, N_PARTIES, BIT_D_NATIVE, BIT_Q, BIT_K, BIT_T, BIT_Q_TOTAL>::execute
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:117:31
+      3: reduce_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:40
+
+bug: Brillig function call isn't properly covered by a manual constraint
+    ┌─ /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:34
+    │
+241 │     let (quotient, _) = unsafe { __compute_mod_reduction(n, q) };
+    │                                  ----------------------------- This Brillig call's inputs and its return values haven't been sufficiently constrained. This should be done to prevent potential soundness vulnerabilities
+    │
+    = Call stack:
+      1: main
+              at decrypted_shares_aggregation/src/main.nr:30:5
+      2: DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, N_PARTIES, BIT_D_NATIVE, BIT_Q, BIT_K, BIT_T, BIT_Q_TOTAL>::execute
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:99:28
+      3: lagrange_coefficients
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:171:27
+      4: inv_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:293:27
+      5: reduce_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:40
+
+bug: Brillig function call isn't properly covered by a manual constraint
+    ┌─ /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:34
+    │
+241 │     let (quotient, _) = unsafe { __compute_mod_reduction(n, q) };
+    │                                  ----------------------------- This Brillig call's inputs and its return values haven't been sufficiently constrained. This should be done to prevent potential soundness vulnerabilities
+    │
+    = Call stack:
+      1: main
+              at decrypted_shares_aggregation/src/main.nr:30:5
+      2: DecryptedSharesAggregation<MAX_MSG_NON_ZERO_COEFFS, L, T, N_PARTIES, BIT_D_NATIVE, BIT_Q, BIT_K, BIT_T, BIT_Q_TOTAL>::execute
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:99:28
+      3: lagrange_coefficients
+              at /tmp/r176/circuits/lib/src/core/threshold/decrypted_shares_aggregation.nr:171:27
+      4: inv_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:293:27
+      5: reduce_mod_bounded
+              at /tmp/r176/circuits/lib/src/math/modulo/U128.nr:241:40
+
+	Command being timed: "nargo compile --force"
+	User time (seconds): 210.34
+	System time (seconds): 8.91
+	Percent of CPU this job got: 332%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:06.00
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 14512448
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 10610659
+	Voluntary context switches: 1635
+	Involuntary context switches: 906
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 16360
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

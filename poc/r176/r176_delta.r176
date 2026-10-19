@@ -1,0 +1,11 @@
+r176 C1 eek/sk SOLO re-anchor @ e5161e6e8 (post-#2195 secure-50-coeffs shape):
+  A1(unblunt)=1634686  E(eek live->NOP)=1597807  S(sk live->NOP)=1597822
+  ACIR: A1=582531 E=549763 S=549763
+  eek_solo(A-E)=36879 g   sk_solo(A-S)=36864 g   eek+sk=73743 g
+vs r170 @ a3bf52007 (OLD pre-fold shape):
+  A1 old=1634722 new=1634686 delta=-36
+  E  old=1597858 new=1597807 delta=-51
+  S  old=1597853 new=1597822 delta=-31
+  eek_solo old=36864 new=36879 delta=+15
+  sk_solo  old=36869 new=36864 delta=-5
+  cell invariant |eek-sk| = 15 g (r170: 5 g); vs C3 e1 36864 (r161): eek delta=+15
