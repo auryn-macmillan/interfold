@@ -1,0 +1,16 @@
+r175 C3 share_encryption RE-ANCHOR @ 6a8afd39d (post-#2195 secure-50-coeffs shape):
+  C3A(unblunt)=2124535  B(check_range_bounds NOP)=1395427  C(per-limb NOP)=1567479
+  ACIR: A=609966 B=224942 C=347822
+  FAMILY(A-B)=729108 g = 34.32% of A leaf
+  PER-LIMB(A-C)=557056 g = 26.22% of A; FLAT(C-B)=172052 g = 8.10%
+  identity: 557056+172052=729108=729108 (holds)
+vs r156 @ 7e999546e (OLD pre-#2195 fold base):
+  A old=2124549 new=2124535 delta=-14 (-0.0007%)
+  B old=1395432 new=1395427 delta=-5
+  C old=1567484 new=1567479 delta=-5
+  ACIR A old=609966 new=609966 delta=+0
+  ACIR B old=224942 new=224942 delta=+0
+  ACIR C old=347822 new=347822 delta=+0
+  FAMILY old=729117 new=729108 delta=-9
+  PER-LIMB old=557065 new=557056 delta=-9
+  FLAT old=172052 new=172052 delta=+0

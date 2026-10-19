@@ -1,0 +1,18 @@
+Preparing worktree (detached HEAD 6a8afd39d)
+Updating files:  93% (3440/3690)Updating files:  94% (3469/3690)Updating files:  95% (3506/3690)Updating files:  96% (3543/3690)Updating files:  97% (3580/3690)Updating files:  98% (3617/3690)Updating files:  99% (3654/3690)Updating files: 100% (3690/3690)Updating files: 100% (3690/3690), done.
+HEAD is now at 6a8afd39d r174: C1 pk_generation RE-ANCHOR RAN @ 7795f18ea post-fold shape - A1 1,634,686 g (delta -36 = -0.0022% vs r157), ACIR digit-identical 582,531; family 1,014,483 / per-limb 811,015 / flat 203,468; identity holds. C1 insensitive to #2195 fold. 0 circuits/ 0 crates/ (receipts-only).
+[2026-10-19T12:32:36Z] HEAD=6a8afd39d1071911d22a856c67e00b9fba38e209
+[2026-10-19T12:33:24Z] WORKTREE-EXISTING-REUSE @ 6a8afd39d1071911d22a856c67e00b9fba38e209
+[2026-10-19T12:33:24Z] HEAD=6a8afd39d1071911d22a856c67e00b9fba38e209
+[2026-10-19T12:36:58Z] C3A_live rc=0 wall=214s
+[2026-10-19T12:37:00Z] LEG A DONE rc=0
+[2026-10-19T12:37:00Z] LEG B SPLICE APPLIED
+[2026-10-19T12:40:31Z] C3B_full rc=0 wall=211s
+[2026-10-19T12:40:32Z] LEG B DONE rc=0
+[2026-10-19T12:40:32Z] LEG C SPLICE APPLIED
+[2026-10-19T12:44:03Z] C3C_limb rc=0 wall=211s
+[2026-10-19T12:44:04Z] RESTORED rc=0
+[2026-10-19T12:44:04Z] RESTORE rc=0 after leg C
+[2026-10-19T12:44:04Z] LEG C DONE rc=0
+[2026-10-19T12:44:04Z] PORC_NONUNTRACKED=0
+R175_STATUS=ALL_OK
