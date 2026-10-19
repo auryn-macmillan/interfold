@@ -32,9 +32,10 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitVariant;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::DkgShareDecryptionCircuit as ShareDecryptionCircuit;
+use e3_zk_witness::dkg::share_decryption::ShareDecryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{Provable, ZkProver};
 
 const COMMITTEE: &str = "micro";
@@ -85,6 +86,7 @@ async fn c4_micro_prove_walls() {
     assert_eq!((committee.n, committee.threshold, committee.h), (9, 4, 5), "micro committee (N=9/T=4/H=5)");
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
+    let cfg_c4 = e3_zk_config::dkg::share_decryption::Configs::for_preset(preset).unwrap();
     assert_eq!(ad, format!("secure-8192/{COMMITTEE}"));
 
     // Honest rows triplicated: all H rows = a copy of row0, keeping the H=5
@@ -94,20 +96,20 @@ async fn c4_micro_prove_walls() {
         d.honest_ciphertexts = (0..d.honest_ciphertexts.len()).map(|_| row0.clone()).collect();
         d
     };
-    let c4a_data = trip(ShareDecryptionCircuitData::generate_sample(preset, committee.clone(), DkgInputType::SecretKey).expect("c4a"));
-    let c4b_data = trip(ShareDecryptionCircuitData::generate_sample(preset, committee.clone(), DkgInputType::SmudgingNoise).expect("c4b"));
+    let c4a_data = trip(e3_zk_samples::dkg::share_decryption::generate(&cfg_c4, preset, committee.clone(), DkgInputType::SecretKey).expect("c4a"));
+    let c4b_data = trip(e3_zk_samples::dkg::share_decryption::generate(&cfg_c4, preset, committee.clone(), DkgInputType::SmudgingNoise).expect("c4b"));
 
     // Leaves (Recursive variant - the proof kind the R75 function embeds), micro committee.
     // c4a first: same-circuit anchor is guaranteed on stdout if the later RAM won't.
     let mut wall = Vec::new();
     let mut t = Instant::now();
     let c4a_proof = ShareDecryptionCircuit
-        .prove_with_variant(&prover, &preset, &c4a_data, "e3-r83-c4a", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c4, &c4a_data, "e3-r83-c4a", CircuitVariant::Recursive, &ad)
         .expect("C4a proof (micro)");
     wall.push(("c4a", t.elapsed().as_secs_f64(), c4a_proof.public_signals.len() / 32));
     t = Instant::now();
     let c4b_proof = ShareDecryptionCircuit
-        .prove_with_variant(&prover, &preset, &c4b_data, "e3-r83-c4b", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c4, &c4b_data, "e3-r83-c4b", CircuitVariant::Recursive, &ad)
         .expect("C4b proof (micro)");
     wall.push(("c4b", t.elapsed().as_secs_f64(), c4b_proof.public_signals.len() / 32));
 

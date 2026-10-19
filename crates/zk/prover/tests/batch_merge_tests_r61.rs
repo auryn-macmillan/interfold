@@ -36,11 +36,10 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::{CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_encryption::{
-    ShareEncryptionCircuit, ShareEncryptionCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_witness::dkg::share_encryption::ShareEncryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     generate_c3_merge_m7x, generate_sequential_c3_fold, Provable, ZkProver,
 };
@@ -72,7 +71,7 @@ async fn stage_circuit(
         format!("{circuit}/target")
     };
     let pkg_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin")
+        .join("../../../circuits/bin")
         .join(group)
         .join(subdir);
     let json = pkg_dir.join(format!("{circuit}.json"));
@@ -130,7 +129,7 @@ fn tail_row(proof: &Proof, s: usize, total_slots: usize) -> Vec<u8> {
 async fn r61_m7x_schedule_aware_equivalence() {
     // The M7x artifact must be the C3_SLOTS=57 (secure-8192/small) build.
     let m7x_json = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold_batch_merge_m7x/target/c3_fold_batch_merge_m7x.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold_batch_merge_m7x/target/c3_fold_batch_merge_m7x.json");
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&m7x_json).unwrap()).unwrap();
     let total_slots = v["abi"]["parameters"]
@@ -150,7 +149,7 @@ async fn r61_m7x_schedule_aware_equivalence() {
     // r62 hit exactly this class (stale micro C3_SLOTS=18 target read mid-run, after all
     // inners + the merge arm had proved) — fail fast instead of ~15 min into the run.
     let c3_json = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&c3_json).unwrap_or_else(|e| {
             panic!("cannot read staged c3_fold.json: {e} — run poc/r61_stage.sh (and r63_c3fold_stage.sh) first")
@@ -186,10 +185,12 @@ async fn r61_m7x_schedule_aware_equivalence() {
     }
 
     let preset = BfvPreset::SecureThreshold8192;
+    let (tp, dp) = preset.build_pair().unwrap();
     let committee = CiphernodesCommitteeSize::Small.values();
     let sd = preset.search_defaults().unwrap();
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
+    let cfg_se = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
 
     let w = w_p(NODE_P);
     assert_eq!(w.len(), 54, "W_1 must be 54 slots (N=19, L=3)");
@@ -210,7 +211,7 @@ async fn r61_m7x_schedule_aware_equivalence() {
     let t0 = Instant::now();
     let inners: Vec<Proof> = (0..54)
         .map(|i| {
-            let sample = ShareEncryptionCircuitData::generate_sample(
+            let sample = e3_zk_samples::dkg::share_encryption::generate(&tp, &dp, 
                 preset.clone(),
                 committee.clone(),
                 DkgInputType::SecretKey,
@@ -220,7 +221,7 @@ async fn r61_m7x_schedule_aware_equivalence() {
             circuit
                 .prove_with_variant(
                     &prover,
-                    &preset,
+                    &cfg_se,
                     &sample,
                     &format!("e3-r61-i{i}"),
                     CircuitVariant::Recursive,

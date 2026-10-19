@@ -46,10 +46,9 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitName;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::threshold::share_decryption::{
-    ShareDecryptionCircuit, ShareDecryptionCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_prover::ThresholdShareDecryptionCircuit as ShareDecryptionCircuit;
+use e3_zk_witness::threshold::share_decryption::ShareDecryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{generate_sequential_c6_fold, CircuitVariant, Provable, ZkProver};
 
 const SLOTS: usize = 10; // small T=9 => T + 1 = 10 C6 slots
@@ -130,6 +129,8 @@ async fn c6_secure_small_fold_chain_proves_and_verifies() {
     let preset = BfvPreset::SecureThreshold8192;
     let committee = CiphernodesCommitteeSize::Small.values();
     let ad = preset.artifacts_dir_for_committee("small");
+    let cfg_c6 = e3_zk_config::threshold::share_decryption::Configs::for_preset(preset).unwrap();
+    let (tp_c6, _dp_c6) = preset.build_pair().unwrap();
     assert_eq!(ad, "secure-8192/small");
     let prover = ZkProver::new(&backend);
 
@@ -139,7 +140,7 @@ async fn c6_secure_small_fold_chain_proves_and_verifies() {
     let mut samples = Vec::with_capacity(SLOTS);
     let t = Instant::now();
     for i in 0..SLOTS {
-        let s = ShareDecryptionCircuitData::generate_sample(preset, committee.clone())
+        let s = e3_zk_samples::threshold::share_decryption::generate(&tp_c6, preset, committee.clone())
             .unwrap_or_else(|e| panic!("C6 sample #{} generation failed at secure/small: {:?}", i, e));
         samples.push(s);
     }
@@ -158,7 +159,7 @@ async fn c6_secure_small_fold_chain_proves_and_verifies() {
         let e3 = format!("e3-r119-c6-inner-{}", i);
         let t = Instant::now();
         let inner = ShareDecryptionCircuit
-            .prove_with_variant(&prover, &preset, &samples[i], &e3, CircuitVariant::Recursive, &ad)
+            .prove_with_variant(&prover, &cfg_c6, &samples[i], &e3, CircuitVariant::Recursive, &ad)
             .unwrap_or_else(|e| {
                 panic!(
                     "C6 inner prove #{} FAILED at secure/small (witness-layer breach, r97 \

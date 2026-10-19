@@ -32,13 +32,14 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitVariant;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::pk::circuit::{PkCircuit, PkCircuitData};
-use e3_zk_helpers::dkg::share_computation::ShareComputationCircuit;
-use e3_zk_helpers::dkg::share_decryption::{ShareDecryptionCircuit, ShareDecryptionCircuitData};
-use e3_zk_helpers::dkg::share_encryption::ShareEncryptionCircuit;
-use e3_zk_helpers::threshold::pk_generation::PkGenerationCircuit;
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::PkCircuit;
+use e3_zk_prover::ShareComputationCircuit;
+use e3_zk_prover::DkgShareDecryptionCircuit as ShareDecryptionCircuit;
+use e3_zk_witness::dkg::share_decryption::ShareDecryptionCircuitData;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_prover::PkGenerationCircuit;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     prove_node_dkg_fold, NodeDkgFoldInput, Provable, ZkProver,
 };
@@ -48,7 +49,6 @@ use node_fold_witness::{
     pk_generation_sample_with_esi, share_computation_esm_from_esi, share_computation_sk_from_pk,
     share_encryption_for_slot,
 };
-use e3_zk_helpers::computation::Computation;
 
 const COMMITTEE: &str = "minimum";
 const NODE_P: u32 = 0; // own party: slots {0,1,2} (L=3 secure-8192); W_P = {3..8}
@@ -109,7 +109,13 @@ async fn node_fold_function_end_to_end_minimum() {
     .expect("stage tree handoff");
 
     let preset = BfvPreset::SecureThreshold8192;
-    let committee = CiphernodesCommitteeSize::Minimum.values();
+    let size = CiphernodesCommitteeSize::Minimum;
+    let cfg_c0 = e3_zk_config::dkg::pk::Configs::for_preset(preset).unwrap();
+    let cfg_c1 = e3_zk_config::threshold::pk_generation::Configs::for_preset(preset, size).unwrap();
+    let cfg_c2 = e3_zk_config::dkg::share_computation::Configs::for_preset(preset, size).unwrap();
+    let cfg_c3 = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
+    let cfg_c4 = e3_zk_config::dkg::share_decryption::Configs::for_preset(preset).unwrap();
+    let committee = size.values();
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
     assert_eq!(ad, format!("secure-8192/{COMMITTEE}"));
@@ -122,32 +128,32 @@ async fn node_fold_function_end_to_end_minimum() {
         .expect("C2a data");
     let share_esm = share_computation_esm_from_esi(preset, committee.clone(), &pk_gen, &esi)
             .expect("C2b data");
-    let sk_inputs = e3_zk_helpers::dkg::share_computation::Inputs::compute(preset, &share_sk)
+    let sk_inputs = e3_zk_witness::dkg::share_computation::Inputs::compute(&cfg_c2, &share_sk)
             .expect("C2a inputs");
-    let esm_inputs = e3_zk_helpers::dkg::share_computation::Inputs::compute(preset, &share_esm)
+    let esm_inputs = e3_zk_witness::dkg::share_computation::Inputs::compute(&cfg_c2, &share_esm)
             .expect("C2b inputs");
-    let pk_bfv_data = PkCircuitData::generate_sample(preset).expect("C0 sample");
+    let pk_bfv_data = e3_zk_samples::dkg::pk::generate(&cfg_c0.params).expect("C0 sample");
 
     // ---- leaves (Recursive variant — the inner/base proofs node_fold embeds). ----
     let mut wall = Vec::new();
     let mut t = Instant::now();
     let c0_proof = PkCircuit
-        .prove_with_variant(&prover, &preset, &pk_bfv_data, "e3-r75-c0", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c0, &pk_bfv_data, "e3-r75-c0", CircuitVariant::Recursive, &ad)
         .expect("C0 pk proof");
     wall.push(("c0", t.elapsed().as_secs_f64()));
     t = Instant::now();
     let c1_proof = PkGenerationCircuit
-        .prove_with_variant(&prover, &preset, &pk_gen, "e3-r75-c1", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c1, &pk_gen, "e3-r75-c1", CircuitVariant::Recursive, &ad)
         .expect("C1 pk_generation proof");
     wall.push(("c1", t.elapsed().as_secs_f64()));
     t = Instant::now();
     let c2a_proof = ShareComputationCircuit
-        .prove_with_variant(&prover, &preset, &share_sk, "e3-r75-c2a", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c2, &share_sk, "e3-r75-c2a", CircuitVariant::Recursive, &ad)
         .expect("C2a proof");
     wall.push(("c2a", t.elapsed().as_secs_f64()));
     t = Instant::now();
     let c2b_proof = ShareComputationCircuit
-        .prove_with_variant(&prover, &preset, &share_esm, "e3-r75-c2b", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c2, &share_esm, "e3-r75-c2b", CircuitVariant::Recursive, &ad)
         .expect("C2b proof");
     wall.push(("c2b", t.elapsed().as_secs_f64()));
 
@@ -167,15 +173,15 @@ async fn node_fold_function_end_to_end_minimum() {
     let mut inners_a = Vec::new();
     let mut inners_b = Vec::new();
     for &slot in &w_p {
-        let da = share_encryption_for_slot(preset, &dkg_sk, &dkg_pk, &sk_inputs, slot as usize, DkgInputType::SecretKey)
+        let da = share_encryption_for_slot(preset, &dkg_pk, &sk_inputs, slot as usize, DkgInputType::SecretKey)
             .expect("C3a slot data");
-        let db = share_encryption_for_slot(preset, &dkg_sk, &dkg_pk, &esm_inputs, slot as usize, DkgInputType::SmudgingNoise)
+        let db = share_encryption_for_slot(preset, &dkg_pk, &esm_inputs, slot as usize, DkgInputType::SmudgingNoise)
             .expect("C3b slot data");
         inners_a.push(ShareEncryptionCircuit
-            .prove_with_variant(&prover, &preset, &da, &format!("e3-r75-c3a-{slot}"), CircuitVariant::Recursive, &ad)
+            .prove_with_variant(&prover, &cfg_c3, &da, &format!("e3-r75-c3a-{slot}"), CircuitVariant::Recursive, &ad)
             .expect("C3a inner"));
         inners_b.push(ShareEncryptionCircuit
-            .prove_with_variant(&prover, &preset, &db, &format!("e3-r75-c3b-{slot}"), CircuitVariant::Recursive, &ad)
+            .prove_with_variant(&prover, &cfg_c3, &db, &format!("e3-r75-c3b-{slot}"), CircuitVariant::Recursive, &ad)
             .expect("C3b inner"));
     }
     wall.push(("c3-inners x12 serial", t.elapsed().as_secs_f64()));
@@ -186,16 +192,16 @@ async fn node_fold_function_end_to_end_minimum() {
         d.honest_ciphertexts = (0..d.honest_ciphertexts.len()).map(|_| row0.clone()).collect();
         d
     };
-    let c4a_data = trip(ShareDecryptionCircuitData::generate_sample(preset, committee.clone(), DkgInputType::SecretKey).expect("c4a"));
-    let c4b_data = trip(ShareDecryptionCircuitData::generate_sample(preset, committee.clone(), DkgInputType::SmudgingNoise).expect("c4b"));
+    let c4a_data = trip(e3_zk_samples::dkg::share_decryption::generate(&cfg_c4, preset, committee.clone(), DkgInputType::SecretKey).expect("c4a"));
+    let c4b_data = trip(e3_zk_samples::dkg::share_decryption::generate(&cfg_c4, preset, committee.clone(), DkgInputType::SmudgingNoise).expect("c4b"));
     t = Instant::now();
     let c4a_proof = ShareDecryptionCircuit
-        .prove_with_variant(&prover, &preset, &c4a_data, "e3-r75-c4a", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c4, &c4a_data, "e3-r75-c4a", CircuitVariant::Recursive, &ad)
         .expect("C4a");
     wall.push(("c4a", t.elapsed().as_secs_f64()));
     t = Instant::now();
     let c4b_proof = ShareDecryptionCircuit
-        .prove_with_variant(&prover, &preset, &c4b_data, "e3-r75-c4b", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c4, &c4b_data, "e3-r75-c4b", CircuitVariant::Recursive, &ad)
         .expect("C4b");
     wall.push(("c4b", t.elapsed().as_secs_f64()));
 

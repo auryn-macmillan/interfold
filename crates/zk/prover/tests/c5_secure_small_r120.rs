@@ -51,10 +51,9 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitName;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::circuits::threshold::pk_aggregation::circuit::{
-    PkAggregationCircuit, PkAggregationCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_prover::PkAggregationCircuit;
+use e3_zk_witness::threshold::pk_aggregation::PkAggregationCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{CircuitVariant, Provable, ZkProver};
 
 const PROVES: usize = 5; // 5 C5 proves at secure/small (single-prove wall datum)
@@ -112,7 +111,9 @@ async fn c5_secure_small_proves_and_verifies() {
         .expect("stage tree handoff to backend circuits_dir");
 
     let preset = BfvPreset::SecureThreshold8192;
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let size = CiphernodesCommitteeSize::Small;
+    let cfg_c5 = e3_zk_config::threshold::pk_aggregation::Configs::for_preset(preset, size).unwrap();
+    let committee = size.values();
     // small: T=9, H=10, N=19
     assert_eq!(committee.h, 10, "small committee H=10 expected, got {}", committee.h);
     let ad = preset.artifacts_dir_for_committee("small");
@@ -132,7 +133,7 @@ async fn c5_secure_small_proves_and_verifies() {
     for i in 0..PROVES {
         // (1) sample: fresh H=10 pk_sks + aggregate.
         let ts = Instant::now();
-        let sample = PkAggregationCircuitData::generate_sample(preset, committee.clone())
+        let sample = e3_zk_samples::threshold::pk_aggregation::generate(&cfg_c5)
             .unwrap_or_else(|e| {
                 panic!(
                     "C5 sample #{} generation FAILED at secure/small (H=10, r97-class \
@@ -149,7 +150,7 @@ async fn c5_secure_small_proves_and_verifies() {
         let proof = PkAggregationCircuit
             .prove_with_variant(
                 &prover,
-                &preset,
+                &cfg_c5,
                 &sample,
                 &e3,
                 CircuitVariant::Default,

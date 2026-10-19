@@ -17,11 +17,10 @@ use common::{
 };
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_encryption::{
-    ShareEncryptionCircuit, ShareEncryptionCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_witness::dkg::share_encryption::ShareEncryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::test_utils::{
     c3_fold_kernel_genesis, extract_single_field, field_keys, fold_witness_field_strings,
     fold_witness_input_map, load_vk_artifacts,
@@ -35,7 +34,7 @@ use serde_json::{json, Value};
 /// C3_SLOTS from the compiled c3_fold ABI (acc_public_inputs = 4 + 3 * slots).
 fn c3_slots() -> usize {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
     let v: Value = serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
     let len = v["abi"]["parameters"].as_array().unwrap().iter().find(|p| {
         p.get("name") == Some(&Value::String("acc_public_inputs".into()))
@@ -107,7 +106,8 @@ async fn serial_vs_batch_wall_clock() {
         return;
     };
     let (backend, _temp) = setup_test_prover(&bb).await;
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
+    let (tp, dp) = preset.build_pair().unwrap();
     let committee = CiphernodesCommitteeSize::Minimum.values();
     let sd = preset.search_defaults().unwrap();
     setup_compiled_circuit(&backend, "dkg", "share_encryption").await;
@@ -116,6 +116,7 @@ async fn serial_vs_batch_wall_clock() {
     }
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee("minimum");
+    let cfg_se = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
     println!("=== I5 r44 WALL CLOCK (real bb proves, box-local) ===");
     println!("preset=insecure-512 committee=minimum C3_SLOTS={total_slots}");
 
@@ -123,7 +124,7 @@ async fn serial_vs_batch_wall_clock() {
     let circuit = ShareEncryptionCircuit;
     let mut inners: Vec<Proof> = Vec::new();
     for i in 0..3u32 {
-        let sample = ShareEncryptionCircuitData::generate_sample(
+        let sample = e3_zk_samples::dkg::share_encryption::generate(&tp, &dp, 
             preset.clone(),
             committee.clone(),
             DkgInputType::SecretKey,
@@ -131,7 +132,7 @@ async fn serial_vs_batch_wall_clock() {
         ).unwrap_or_else(|_| panic!("no sample for inner {i}"));
         let t0 = Instant::now();
         let p = circuit
-            .prove_with_variant(&prover, &preset, &sample, &format!("e3-r44-in{i}"), CircuitVariant::Recursive, &ad)
+            .prove_with_variant(&prover, &cfg_se, &sample, &format!("e3-r44-in{i}"), CircuitVariant::Recursive, &ad)
             .unwrap_or_else(|e| panic!("inner {i} ZK prove failed: {e}"));
         println!("  [shared inner {i}: ShareEncryption ZK ultra_honk] wall = {:6.1}s", secs(&t0));
         inners.push(p);

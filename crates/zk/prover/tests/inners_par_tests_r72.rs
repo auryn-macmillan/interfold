@@ -32,9 +32,10 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitVariant;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_encryption::{ShareEncryptionCircuit, ShareEncryptionCircuitData};
-use e3_zk_helpers::{CiphernodesCommittee, CiphernodesCommitteeSize};
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_witness::dkg::share_encryption::ShareEncryptionCircuitData;
+use e3_committee::{CiphernodesCommittee, CiphernodesCommitteeSize};
 use e3_zk_prover::{Provable, ZkBackend, ZkProver};
 
 const COMMITTEE: &str = "small";
@@ -94,7 +95,7 @@ fn vmhwm_mb() -> f64 {
 /// staged 08-28 (r61_stage.sh) and is what the r70 leg ran against.
 async fn stage_secure_leaf(backend: &ZkBackend) {
     let pkg_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/dkg/target");
+        .join("../../../circuits/bin/dkg/target");
     let json = pkg_dir.join("share_encryption.json");
     let vk = pkg_dir.join("share_encryption.vk_noir");
     let vk_h = pkg_dir.join("share_encryption.vk_noir_hash");
@@ -133,6 +134,8 @@ fn phase(
     z: u128,
     dd: u64,
 ) -> (f64, f64, f64) {
+    let (tp, dp) = preset.build_pair().unwrap();
+    let cfg_se = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
     let h0 = vmhwm_mb();
     let mema0 = val_mb("MemAvailable:");
     let swap0 = val_mb("SwapFree:");
@@ -147,9 +150,12 @@ fn phase(
                 let preset = preset.clone();
                 let committee = committee.clone();
                 let ad = ad.clone();
+                let tp = &tp;
+                let dp = &dp;
+                let cfg_se = &cfg_se;
                 sc.spawn(move || {
                     let presenter = ShareEncryptionCircuit;
-                    let sample = ShareEncryptionCircuitData::generate_sample(
+                    let sample = e3_zk_samples::dkg::share_encryption::generate(&tp, &dp, 
                         preset,
                         committee.clone(),
                         DkgInputType::SecretKey,
@@ -158,7 +164,7 @@ fn phase(
                     .expect("r72 sample");
                     let _ = presenter.prove_with_variant(
                         &prover,
-                        &BfvPreset::SecureThreshold8192,
+                        &cfg_se,
                         &sample,
                         &format!("e3-r72-{label}-i{pi}"),
                         CircuitVariant::Recursive,

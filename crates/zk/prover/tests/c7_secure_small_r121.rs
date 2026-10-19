@@ -57,10 +57,9 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitName;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::circuit::{
-    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_prover::DecryptedSharesAggregationCircuit;
+use e3_zk_witness::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{CircuitVariant, Provable, ZkProver};
 
 const PROVES: usize = 5; // 5 C7 proves at secure/small (single-prove wall datum)
@@ -126,7 +125,9 @@ async fn c7_secure_small_proves_and_verifies() {
         .expect("stage tree handoff to backend circuits_dir");
 
     let preset = BfvPreset::SecureThreshold8192;
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let size = CiphernodesCommitteeSize::Small;
+    let cfg_c7 = e3_zk_config::threshold::decrypted_shares_aggregation::Configs::for_preset(preset, size).unwrap();
+    let committee = size.values();
     // small: T=9, H=10, N=19
     assert_eq!(committee.h, 10, "small committee H=10 expected, got {}", committee.h);
     assert_eq!(committee.n, 19, "small committee N=19 expected, got {}", committee.n);
@@ -149,7 +150,7 @@ async fn c7_secure_small_proves_and_verifies() {
     for i in 0..PROVES {
         // (1) sample: fresh 19-party TRBFV secrets + T=9 decryption shares.
         let ts = Instant::now();
-        let sample = DecryptedSharesAggregationCircuitData::generate_sample(preset, committee.clone())
+        let sample = e3_zk_samples::threshold::decrypted_shares_aggregation::generate(&cfg_c7, preset)
             .unwrap_or_else(|e| {
                 panic!(
                     "C7 sample #{} generation FAILED at secure/small (T=9, r97-class \
@@ -166,7 +167,7 @@ async fn c7_secure_small_proves_and_verifies() {
         let proof = DecryptedSharesAggregationCircuit
             .prove_with_variant(
                 &prover,
-                &preset,
+                &cfg_c7,
                 &sample,
                 &e3,
                 CircuitVariant::Default,

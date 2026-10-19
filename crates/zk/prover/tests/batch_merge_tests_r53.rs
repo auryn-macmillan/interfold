@@ -20,11 +20,10 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::{CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_encryption::{
-    ShareEncryptionCircuit, ShareEncryptionCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_witness::dkg::share_encryption::ShareEncryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     generate_c3_merge_m1, generate_sequential_c3_fold, Provable, ZkProver,
 };
@@ -45,7 +44,7 @@ async fn stage_circuit(
         format!("{circuit}/target")
     };
     let pkg_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin")
+        .join("../../../circuits/bin")
         .join(group)
         .join(subdir);
     let json = pkg_dir.join(format!("{circuit}.json"));
@@ -86,7 +85,7 @@ fn secs(t: &Instant) -> f64 {
 #[tokio::test]
 async fn r53_m1_merge_e2e_equivalence() {
     let c3_slots_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&c3_slots_path).unwrap()).unwrap();
     let total_slots = v["abi"]["parameters"]
@@ -118,16 +117,18 @@ async fn r53_m1_merge_e2e_equivalence() {
         stage_circuit(&backend, "recursive_aggregation", c, "default").await;
     }
 
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
+    let (tp, dp) = preset.build_pair().unwrap();
     let committee = CiphernodesCommitteeSize::Micro.values();
     let sd = preset.search_defaults().unwrap();
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
+    let cfg_se = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
 
     let circuit = ShareEncryptionCircuit;
     let inners: Vec<Proof> = (0..N_INNERS)
         .map(|i| {
-            let sample = ShareEncryptionCircuitData::generate_sample(
+            let sample = e3_zk_samples::dkg::share_encryption::generate(&tp, &dp, 
                 preset.clone(),
                 committee.clone(),
                 DkgInputType::SecretKey,
@@ -137,7 +138,7 @@ async fn r53_m1_merge_e2e_equivalence() {
             circuit
                 .prove_with_variant(
                     &prover,
-                    &preset,
+                    &cfg_se,
                     &sample,
                     &format!("e3-r53-i{i}"),
                     CircuitVariant::Recursive,

@@ -41,11 +41,10 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_encryption::{
-    ShareEncryptionCircuit, ShareEncryptionCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_witness::dkg::share_encryption::ShareEncryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::circuits::utils::inputs_json_to_input_map;
 use e3_zk_prover::circuits::vk::load_vk_artifacts;
 use e3_zk_prover::{
@@ -82,7 +81,7 @@ async fn stage_circuit(
         format!("{circuit}/target")
     };
     let pkg_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin")
+        .join("../../../circuits/bin")
         .join(group)
         .join(subdir);
     let json = pkg_dir.join(format!("{circuit}.json"));
@@ -168,7 +167,7 @@ fn hex_of(bytes: &[u8]) -> String {
 /// Stage the c3ab FK-guard: the on-disk c3ab json must be the small build (175/arm).
 fn assert_small_c3ab_json() {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3ab_fold/target/c3ab_fold.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3ab_fold/target/c3ab_fold.json");
     let v: serde_json::Value = serde_json::from_str(
         &std::fs::read_to_string(&p)
             .unwrap_or_else(|e| panic!("cannot read staged c3ab_fold.json: {e} — run poc/r65_c3ab_vk.sh first")),
@@ -196,7 +195,7 @@ fn slots_of(proof: &Proof) -> usize {
 async fn r65_c3ab_wiring_seam_m7x_c3b_c3fold_c3a() {
     // Fail-fast guards (r63 class): M7x + c3_fold bases must be the C3_SLOTS=57 build.
     let m7x_json = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold_batch_merge_m7x/target/c3_fold_batch_merge_m7x.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold_batch_merge_m7x/target/c3_fold_batch_merge_m7x.json");
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&m7x_json).unwrap()).unwrap();
     let total_slots = v["abi"]["parameters"]
@@ -209,7 +208,7 @@ async fn r65_c3ab_wiring_seam_m7x_c3b_c3fold_c3a() {
         .unwrap() as usize;
     assert_eq!(total_slots, 57, "M7x artifact is not C3_SLOTS=57 (secure/small)");
     let c3_json = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&c3_json).unwrap()).unwrap();
     let c3_slots = v["abi"]["parameters"]
@@ -242,10 +241,12 @@ async fn r65_c3ab_wiring_seam_m7x_c3b_c3fold_c3a() {
     }
 
     let preset = BfvPreset::SecureThreshold8192;
+    let (tp, dp) = preset.build_pair().unwrap();
     let committee = CiphernodesCommitteeSize::Small.values();
     let sd = preset.search_defaults().unwrap();
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
+    let cfg_se = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
 
     // --- 84 secure inners, serial (54 c3b-lane + 30 c3a-lane). Serial deliberate: the
     //     r63 RAN maxrss for the 54-inner + 2-arm class was 10.27 GiB UNCONTESTED on this
@@ -266,7 +267,7 @@ async fn r65_c3ab_wiring_seam_m7x_c3b_c3fold_c3a() {
         (0u32, "c3a", DkgInputType::SmudgingNoise, c3a_count),
     ] {
         for j in 0..n {
-            let sample = ShareEncryptionCircuitData::generate_sample(
+            let sample = e3_zk_samples::dkg::share_encryption::generate(&tp, &dp, 
                 preset.clone(),
                 committee.clone(),
                 dkg_type.clone(),
@@ -276,7 +277,7 @@ async fn r65_c3ab_wiring_seam_m7x_c3b_c3fold_c3a() {
             let p = presenter
                 .prove_with_variant(
                     &prover,
-                    &preset,
+                    &cfg_se,
                     &sample,
                     &format!("e3-r65-{tag}-i{i}{j}"),
                     CircuitVariant::Recursive,

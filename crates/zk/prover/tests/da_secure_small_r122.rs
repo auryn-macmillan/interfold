@@ -64,13 +64,12 @@ use e3_fhe_params::{
     build_pair_for_preset, create_deterministic_crp_from_default_seed, BfvPreset,
 };
 use e3_polynomial::CrtPolynomial;
-use e3_zk_helpers::circuits::threshold::decrypted_shares_aggregation::circuit::{
-    DecryptedSharesAggregationCircuit, DecryptedSharesAggregationCircuitData,
-};
-use e3_zk_helpers::threshold::share_decryption::{
-    ShareDecryptionCircuit, ShareDecryptionCircuitData,
-};
-use e3_zk_helpers::{CiphernodesCommittee, CiphernodesCommitteeSize};
+use e3_polynomial_fhe::FromFhePolynomial;
+use e3_zk_prover::DecryptedSharesAggregationCircuit;
+use e3_zk_witness::threshold::decrypted_shares_aggregation::DecryptedSharesAggregationCircuitData;
+use e3_zk_prover::ThresholdShareDecryptionCircuit as ShareDecryptionCircuit;
+use e3_zk_witness::threshold::share_decryption::ShareDecryptionCircuitData;
+use e3_committee::{CiphernodesCommittee, CiphernodesCommitteeSize};
 use e3_zk_prover::{
     prove_decryption_aggregation_jobs, DecryptionAggregationJob, Provable, ZkProver,
 };
@@ -160,7 +159,7 @@ fn build_shared_world(
         let esi_sss_j = {
             let mut sm_j = ShareManager::new(n, t, threshold_params.clone()).unwrap();
             let esi_bigints = trbfv
-                .generate_smudging_error(sd.z as usize, lambda, &mut rand::rng())
+                .generate_smudging_error(sd.z as usize, 0, lambda, &mut rand::rng())
                 .expect("esi draw");
             let esi_bigints_bi: Vec<num_bigint::BigInt> = esi_bigints
                 .iter()
@@ -285,7 +284,10 @@ async fn da_secure_small_proves_and_verifies() {
     .expect("stage handoff to backend circuits_dir");
 
     let preset = BfvPreset::SecureThreshold8192;
-    let committee = CiphernodesCommitteeSize::Small.values();
+    let size = CiphernodesCommitteeSize::Small;
+    let cfg_c6 = e3_zk_config::threshold::share_decryption::Configs::for_preset(preset).unwrap();
+    let cfg_c7 = e3_zk_config::threshold::decrypted_shares_aggregation::Configs::for_preset(preset, size).unwrap();
+    let committee = size.values();
     assert_eq!(committee.n, N, "Small N=19");
     assert_eq!(committee.h, SLOTS, "Small H=10");
     assert_eq!(committee.threshold, SLOTS - 1, "Small T=9");
@@ -312,7 +314,6 @@ async fn da_secure_small_proves_and_verifies() {
         let e3 = format!("e3-r122-c6i-{}", i);
         let sample = ShareDecryptionCircuitData {
             ciphertext: ct.clone(),
-            public_key: pk.clone(),
             s: sk_sums[i].clone(),
             e: es_sums[i].clone(),
             d_share: CrtPolynomial::from_fhe_polynomial(&d_shares[i]),
@@ -322,7 +323,7 @@ async fn da_secure_small_proves_and_verifies() {
         let ti = Instant::now();
         let inner = ShareDecryptionCircuit
             .prove_with_variant(
-                &prover, &preset, &sample, &e3, CircuitVariant::Recursive, &ad,
+                &prover, &cfg_c6, &sample, &e3, CircuitVariant::Recursive, &ad,
             )
             .unwrap_or_else(|e| {
                 panic!(
@@ -343,14 +344,13 @@ async fn da_secure_small_proves_and_verifies() {
     // ---- 1 C7 (Default variant) on the SAME 10 d_shares ----
     let e3_c7 = "e3-r122-c7";
     let c7_sample = DecryptedSharesAggregationCircuitData {
-        committee: CiphernodesCommittee { n: N, h: SLOTS, threshold: SLOTS - 1 },
         d_share_polys: d_shares.clone(),
         reconstructing_parties: (1..=SLOTS).collect(),
         message_vec,
     };
     let ti = Instant::now();
     let c7_proof = DecryptedSharesAggregationCircuit
-        .prove_with_variant(&prover, &preset, &c7_sample, e3_c7, CircuitVariant::Default, &ad)
+        .prove_with_variant(&prover, &cfg_c7, &c7_sample, e3_c7, CircuitVariant::Default, &ad)
         .unwrap_or_else(|e| panic!("C7 PROVE FAILED at secure/small: {:?}", e));
     let c7_wall = ti.elapsed().as_secs_f64();
     walls.push(("C7 (Default, shared)".into(), c7_wall));

@@ -33,9 +33,8 @@ use std::time::Instant;
 use common::{find_bb, setup_test_prover};
 use e3_events::CircuitVariant;
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::Computation;
-use e3_zk_helpers::dkg::share_computation::ShareComputationCircuit;
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_prover::ShareComputationCircuit;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{Provable, ZkProver};
 use node_fold_witness::{
     pk_generation_sample_with_esi, share_computation_esm_from_esi, share_computation_sk_from_pk,
@@ -85,7 +84,9 @@ async fn c2_micro_prove_walls() {
     .expect("stage tree handoff");
 
     let preset = BfvPreset::SecureThreshold8192;
-    let committee = CiphernodesCommitteeSize::Micro.values();
+    let size = CiphernodesCommitteeSize::Micro;
+    let cfg_c2 = e3_zk_config::dkg::share_computation::Configs::for_preset(preset, size).unwrap();
+    let committee = size.values();
     assert_eq!((committee.n, committee.threshold, committee.h), (9, 4, 5), "micro committee (N=9/T=4/H=5)");
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee(COMMITTEE);
@@ -99,20 +100,20 @@ async fn c2_micro_prove_walls() {
         .expect("C2a data");
     let share_esm = share_computation_esm_from_esi(preset, committee.clone(), &pk_gen, &esi)
         .expect("C2b data");
-    let _ = e3_zk_helpers::dkg::share_computation::Inputs::compute(preset, &share_sk).expect("C2a inputs");
-    let _ = e3_zk_helpers::dkg::share_computation::Inputs::compute(preset, &share_esm).expect("C2b inputs");
+    let _ = e3_zk_witness::dkg::share_computation::Inputs::compute(&cfg_c2, &share_sk).expect("C2a inputs");
+    let _ = e3_zk_witness::dkg::share_computation::Inputs::compute(&cfg_c2, &share_esm).expect("C2b inputs");
 
     // leaves (Recursive variant — the proof kind node_fold embeds), micro committee. c2a first
     // (4.28M gates < c2b 5.73M): if the RAM wall bites, c2a's number is already on stdout.
     let mut wall = Vec::new();
     let mut t = Instant::now();
     let c2a_proof = ShareComputationCircuit
-        .prove_with_variant(&prover, &preset, &share_sk, "e3-r82-c2a", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c2, &share_sk, "e3-r82-c2a", CircuitVariant::Recursive, &ad)
         .expect("C2a proof (micro)");
     wall.push(("c2a", t.elapsed().as_secs_f64(), c2a_proof.public_signals.len() / 32));
     t = Instant::now();
     let c2b_proof = ShareComputationCircuit
-        .prove_with_variant(&prover, &preset, &share_esm, "e3-r82-c2b", CircuitVariant::Recursive, &ad)
+        .prove_with_variant(&prover, &cfg_c2, &share_esm, "e3-r82-c2b", CircuitVariant::Recursive, &ad)
         .expect("C2b proof (micro)");
     wall.push(("c2b", t.elapsed().as_secs_f64(), c2b_proof.public_signals.len() / 32));
 

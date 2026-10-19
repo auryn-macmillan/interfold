@@ -28,18 +28,17 @@ use common::{
 };
 use e3_events::{CircuitName, CircuitVariant, Proof};
 use e3_fhe_params::BfvPreset;
-use e3_zk_helpers::computation::DkgInputType;
-use e3_zk_helpers::dkg::share_encryption::{
-    ShareEncryptionCircuit, ShareEncryptionCircuitData,
-};
-use e3_zk_helpers::CiphernodesCommitteeSize;
+use e3_zk_config::DkgInputType;
+use e3_zk_prover::ShareEncryptionCircuit;
+use e3_zk_witness::dkg::share_encryption::ShareEncryptionCircuitData;
+use e3_committee::CiphernodesCommitteeSize;
 use e3_zk_prover::{
     generate_batched_c3_fold_b3, generate_sequential_c3_fold, Provable, ZkProver,
 };
 
 fn c3_slots() -> usize {
     let p = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
+        .join("../../../circuits/bin/recursive_aggregation/c3_fold/target/c3_fold.json");
     let v: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(p).unwrap()).unwrap();
     let len = v["abi"]["parameters"]
@@ -64,12 +63,14 @@ async fn r11_b3_dropin_equivalence() {
         return;
     };
     let (backend, _temp) = setup_test_prover(&bb).await;
-    let preset = BfvPreset::InsecureThreshold512;
+    let preset = BfvPreset::InsecureThreshold64;
+    let (tp, dp) = preset.build_pair().unwrap();
     let committee = CiphernodesCommitteeSize::Minimum.values();
     let sd = preset.search_defaults().unwrap();
     setup_compiled_circuit(&backend, "dkg", "share_encryption").await;
     let prover = ZkProver::new(&backend);
     let ad = preset.artifacts_dir_for_committee("minimum");
+    let cfg_se = e3_zk_config::dkg::share_encryption::Configs::for_preset(preset).unwrap();
     for c in [
         CircuitName::C3Fold,
         CircuitName::C3FoldKernel,
@@ -84,7 +85,7 @@ async fn r11_b3_dropin_equivalence() {
     let circuit = ShareEncryptionCircuit;
     let inners: Vec<Proof> = (0..n as u32)
         .map(|i| {
-            let sample = ShareEncryptionCircuitData::generate_sample(
+            let sample = e3_zk_samples::dkg::share_encryption::generate(&tp, &dp, 
                 preset.clone(),
                 committee.clone(),
                 DkgInputType::SecretKey,
@@ -94,7 +95,7 @@ async fn r11_b3_dropin_equivalence() {
             circuit
                 .prove_with_variant(
                     &prover,
-                    &preset,
+                    &cfg_se,
                     &sample,
                     &format!("e3-r11-i{i}"),
                     CircuitVariant::Recursive,
