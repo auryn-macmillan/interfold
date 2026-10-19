@@ -2,56 +2,41 @@
 //
 //! r130 regression: fixture-bootstrap nested-cargo deadlock (r127 n2, composite fix).
 //!
-//! Deadlock mechanism (r127 RAN diagnosis): `crates/zk-prover/build.rs` runs
+//! Deadlock mechanism (r127 RAN diagnosis): `crates/zk/prover/build.rs` runs
 //! `scripts/build_fixtures.sh`, which — when the 3 recursive_aggregation fold
 //! artifacts (c3_fold / c6_fold / c6_fold_kernel json) are missing from a lean
-//! checkout — previously invoked `pnpm build:circuits`, whose
-//! `regenerateParityMatrices()` ran a NESTED `cargo run --release --bin
-//! generate_parity_matrices` in the SAME target dir while the OUTER `cargo
-//! test`/`cargo build` process still held `target/release/.cargo-lock`.
-//! Outer waits on build.rs; build.rs waits on pnpm; pnpm waits on the nested
-//! cargo; the nested cargo waits on the outer lock. Deadlock: the first
-//! `cargo test` (or `cargo build`) of the zk-prover crate on a lean checkout
-//! could NEVER complete (r127 observed this via a second outer job hang).
+//! checkout — invokes `pnpm build:circuits`. Pre-fix, that builder ran a NESTED
+//! `cargo run --release --bin generate_parity_matrices` in the SAME target dir
+//! while the OUTER `cargo test`/`cargo build` process still held
+//! `target/release/.cargo-lock`. Outer waits on build.rs; build.rs waits on
+//! pnpm; pnpm waits on the nested cargo; the nested cargo waits on the outer
+//! lock. Deadlock: the first `cargo test` (or `cargo build`) of the zk-prover
+//! crate on a lean checkout could NEVER complete (r127 observed this via a
+//! second outer job hang).
 //!
-//! Composite fix under test (this round), as carried AFTER the 2026-09-25
-//! rebase onto upstream main (which independently removed the nested cargo
-//! call from `build:circuits` on 2026-09-24 — #1984):
-//!   FIX1: `scripts/build-circuits.ts` gains `--skip-regen-parity`;
-//!         `regenerateParityMatrices()` early-returns, trusting the COMMITTED
-//!         on-disk parity matrices (they are git-tracked literals under
-//!         circuits/lib/src/configs/committee/<committee>/parity_{insecure,secure}.nr;
-//!         the only mutation path documented is a top-level manual regen).
-//!         (Recallable code path — keeps a no-nested-cargo escape hatch even
-//!         though the build no longer bypasses it in-tree.)
-//!   FIX2: `crates/zk-prover/scripts/build_fixtures.sh` invokes
-//!         `pnpm build:circuits` WITHOUT touching the outer cargo's target
-//!         directory: CARGO_TARGET_DIR is redirected to a sibling fixtures
-//!         dir ($PWD/target/e3-zk-prover-fixtures), so any cargo the builder
-//!         spawns cannot park on target/release/.cargo-lock. (This matches
-//!         the upstream fix that landed in the 2026-09-24 rebase; our
-//!         --skip-regen-parity flag remains available as documented above.)
-//!   FIX3: `scripts/build-circuits.ts` classifies Noir `type = "lib"` packages
-//!         (e.g. c3_fold_batch_lib) as dep-only and skips them — `nargo
-//!         compile` RC 0 emits no artifact for a lib, which the
-//!         artifact-existence check would reject.
+//! R178 FOLD-FORWARD UPDATE: upstream #2260 ("move circuit build ownership
+//! into Rust") deleted `scripts/build-circuits.ts`; `pnpm build:circuits` is
+//! now `cargo run --quiet --locked -p e3-zk-build --`. The TS-side guards of
+//! the r130 composite fix (FIX1 `--skip-regen-parity`, FIX3 `isLibOnly`)
+//! died with the file and are obsolete: the Rust builder regenerates parity
+//! matrices in-process (no nested `cargo run` call site exists anywhere in
+//! the chain any more — see the negative-core assertion below). The
+//! deadlock-class defense that REMAINS load-bearing is FIX2: the
+//! CARGO_TARGET_DIR redirect in build_fixtures.sh, now carried by upstream
+//! itself. This test is retained (r130 evidence) re-anchored to the
+//! post-#2260 shape: FIX2 redirect present + no nested-cargo call site in
+//! the bootstrap chain.
 //!
-//! RAN proof this leg (see poc/r130/RESULT.txt + v5_run.log):
-//!   (a) the EXACT deadlocking call pattern still deadlocks TODAY with a
+//! RAN proof of the original fix (see poc/r130/RESULT.txt + v5_run.log):
+//!   (a) the EXACT deadlocking call pattern still deadlocked at r130 with a
 //!       pre-fix-shaped invocation (nested `cargo run` under an outer cargo in
-//!       the same target dir) — the mechanism is alive bash-verified; the fix
-//!       is the removal of that call, and
-//!   (b) the SAME dead context (an outer -x flock on target/release/.cargo-lock,
-//!       the r127 n2 shape) now drives a lean stage tree missing all required
-//!       fold artifacts through the FIXED bootstrap: build_fixtures.sh ->
-//!       `pnpm build:circuits --skip-regen-parity` -> 36/36 circuits compile
-//!       (incl. the 4 deleted artifacts) -> artifacts land BYTE-IDENTICAL to
-//!       the r111/r115-anchored SHAs -> RC 0 in 180 s, with ZERO nested
-//!       `cargo` processes spawned during the whole run (PATH cargo-trap
-//!       observable). No hang.
+//!       the same target dir), and
+//!   (b) the FIXED bootstrap drove a lean stage tree missing all required
+//!       fold artifacts through 36/36 circuit compiles with ZERO nested
+//!       `cargo` processes in the dead context. No hang.
 
 #[test]
-fn r130_bootstrap_skips_nested_cargo_parity_regen() {
+fn r130_bootstrap_redirects_nested_cargo_off_outer_target_dir() {
     // The test binary runs with cwd = crate root, but the repo paths the
     // preload fix touches are workspace-root-relative — resolve from the
     // manifest dir (the same way build.rs reaches the same script).
@@ -59,53 +44,38 @@ fn r130_bootstrap_skips_nested_cargo_parity_regen() {
         .join("../..")
         .canonicalize()
         .expect("workspace root");
-    let sh = std::fs::read_to_string(root.join("crates/zk-prover/scripts/build_fixtures.sh"))
-        .unwrap_or_else(|e| panic!("crates/zk-prover/scripts/build_fixtures.sh unreadable: {e}"));
-    let ts = std::fs::read_to_string(root.join("scripts/build-circuits.ts"))
-        .unwrap_or_else(|e| panic!("scripts/build-circuits.ts unreadable: {e}"));
+    let sh = std::fs::read_to_string(root.join("crates/zk/prover/scripts/build_fixtures.sh"))
+        .unwrap_or_else(|e| panic!("crates/zk/prover/scripts/build_fixtures.sh unreadable: {e}"));
 
-    // FIX2: the in-cargo bootstrap must redirect CARGO_TARGET_DIR off the
-    // outer cargo's target directory (post-2026-09-24-rebase shape; matches
-    // the upstream independent fix of the same deadlock, #1984). A nested
-    // cargo with the SAME target dir parks on the outer target's
-    // .cargo-lock forever (r127 n2 / r130) — any in-cargo invocation of
-    // build:circuits without the redirect reopens the class.
+    // FIX2 (load-bearing, now upstream-carried): the in-cargo bootstrap must
+    // redirect CARGO_TARGET_DIR off the outer cargo's target directory
+    // (post-2026-09-24-rebase shape; matches the upstream independent fix of
+    // the same deadlock, #1984). A nested cargo with the SAME target dir
+    // parks on the outer target's .cargo-lock forever (r127 n2 / r130) — any
+    // in-cargo invocation of build:circuits without the redirect reopens the
+    // class.
     assert!(
         sh.contains("CARGO_TARGET_DIR=\"${CARGO_TARGET_DIR:-$PWD/target}/e3-zk-prover-fixtures\" pnpm build:circuits"),
         "build_fixtures.sh lost the CARGO_TARGET_DIR redirect: the in-cargo \
          fixture bootstrap would deadlock on target/.cargo-lock again (r127 n2 / r130)"
     );
 
-    // FIX1: the skip hook exists in the builder.
+    // Negative core (post-#2260 re-anchor): the deadlock's original call site
+    // was a nested `cargo run` inside the TS builder. The TS builder is gone;
+    // the chain must NOT reintroduce any nested `cargo run`/`cargo build`
+    // call in build_fixtures.sh itself (pnpm build:circuits IS a cargo run —
+    // that is the one cargo the redirect protects; nothing else may spawn
+    // cargo from inside this script).
+    let cargo_calls: Vec<&str> = sh
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .filter(|l| l.contains("cargo run") || l.contains("cargo build"))
+        .collect();
     assert!(
-        ts.contains("skipRegenParity"),
-        "build-circuits.ts lost the skipRegenParity hook: the parity-matrices \
-         regen path has no in-cargo escape hatch (r130 FIX1)"
+        cargo_calls.is_empty(),
+        "build_fixtures.sh reintroduces a direct nested cargo call outside the \
+         redirected pnpm build:circuits path (r130 deadlock class): {cargo_calls:?}"
     );
 
-    // FIX3: lib-only Noir packages are classified and skipped.
-    assert!(
-        ts.contains("isLibOnly"),
-        "build-circuits.ts lost the isLibOnly classifier: a lib-only package \
-         (e.g. c3_fold_batch_lib) would re-fail the build with \
-         'compiled artifact not found' (r130 FIX3)"
-    );
-
-    // Negative core: the nested `cargo run` call site still exists, and the
-    // skip-guard PRECEDES it (a guardless nested-cargo call anywhere in the
-    // in-cargo bootstrap chain resurrects the deadlock class). Locate by the
-    // execSync that spawns it, not by counting doc-comment mentions.
-    let regen_call = ts
-        .find("execSync(`cargo run")
-        .expect("nested parity-matrix regen call missing");
-    let try_guard = ts
-        .find("if (this.options.skipRegenParity)")
-        .expect("skip-guard missing");
-    assert!(
-        try_guard < regen_call,
-        "skip-guard does not precede the nested `cargo run` call: the guard is \
-         ineffective (r130 FIX1 invalidated)"
-    );
-
-    println!("PASS r130: bootstrap chain carries --skip-regen-parity (FIX1+FIX2+FIX3)");
+    println!("PASS r130: bootstrap chain keeps the CARGO_TARGET_DIR redirect, no direct nested cargo (post-#2260 shape)");
 }
