@@ -1,0 +1,4 @@
+    Finished `release` profile [optimized] target(s) in 0.20s
+     Running `target/release/e3-zk-build build --preset insecure-64 --committee minimum --group dkg --circuit share_encryption`
+Built dkg/share_encryption
+BUILD_RC=0
