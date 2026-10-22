@@ -130,9 +130,9 @@ async fn batched_c3_fold_dropin_equivalence() {
 
     let s = fold_witness_field_strings(&seq.public_signals).unwrap();
     let b = fold_witness_field_strings(&bat.public_signals).unwrap();
-    assert_eq!(s.len(), 4 + 3 * total_slots, "seq pub signals len ({})", s.len());
+    assert_eq!(s.len(), 5 + 3 * total_slots, "seq pub signals len ({})", s.len()); // post-#1999 c3_fold is 5-prefix
     assert_eq!(b.len(), 5 + 3 * total_slots, "bat pub signals len ({})", b.len());
-    let eq = s[4..] == b[5..];
+    let eq = s[5..] == b[5..]; // both arms now 5-prefix; compare slot tails
     println!("  IDENTICAL ACCUMULATOR STATE ({} slot fields): {}", total_slots * 3, eq);
     assert!(eq, "sequential and batched folds must be byte-identical");
     println!("=================================================");

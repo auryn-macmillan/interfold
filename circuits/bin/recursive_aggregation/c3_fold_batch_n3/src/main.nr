@@ -13,7 +13,7 @@ use lib::configs::default::dkg::L_THRESHOLD;
 use lib::configs::default::N_PARTIES;
 
 pub global C3_SLOTS: u32 = N_PARTIES * L_THRESHOLD;
-pub global C3_FOLD_PUBLIC_LEN: u32 = 4 + (3 * C3_SLOTS);
+pub global C3_FOLD_PUBLIC_LEN: u32 = 5 + (3 * C3_SLOTS); // post-#1999: c3_fold/kernel anchor are 5-prefix
 pub global C3_FOLD_PREFIX_LEN: u32 = C3_FOLD_PUBLIC_LEN - (3 * C3_SLOTS);
 
 pub global LEAVES_COUNT: u32 = 2;
@@ -59,7 +59,7 @@ fn main(
     let mut msg: [Field; C3_SLOTS] = [0; C3_SLOTS];
     let mut ct: [Field; C3_SLOTS] = [0; C3_SLOTS];
     // carry the kernel anchor (slot 0) from the genesis accumulator
-    pk[0] = api[4]; msg[0] = api[4 + C3_SLOTS]; ct[0] = api[4 + (2 * C3_SLOTS)];
+    pk[0] = api[5]; msg[0] = api[5 + C3_SLOTS]; ct[0] = api[5 + (2 * C3_SLOTS)]; // slot 0 lives at prefix index 5 (post-#1999)
     pk[1] = p0; msg[1] = m0; ct[1] = c0;
     pk[2] = p1; msg[2] = m1; ct[2] = c1;
     (pk, msg, ct)
